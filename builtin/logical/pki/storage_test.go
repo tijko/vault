@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"testing"
 
-	"github.com/hashicorp/go-uuid"
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/helper/certutil"
 	"github.com/hashicorp/vault/sdk/logical"
@@ -28,10 +27,10 @@ func Test_ConfigsRoundTrip(t *testing.T) {
 
 	// Now attempt to store and reload properly
 	origKeyConfig := &keyConfig{
-		DefaultKeyId: genKeyId(t),
+		DefaultKeyId: genTestingKeyId(t),
 	}
 	origIssuerConfig := &issuerConfig{
-		DefaultIssuerId: genIssuerId(t),
+		DefaultIssuerId: genTestingIssuerId(t),
 	}
 
 	err = setKeysConfig(ctx, s, origKeyConfig)
@@ -62,14 +61,14 @@ func Test_IssuerRoundTrip(t *testing.T) {
 	require.Error(t, err)
 
 	// Now write out our issuers and keys
-	err = writeKey(ctx, s, key1)
+	err = writeKey(ctx, s, &key1)
 	require.NoError(t, err)
-	err = writeIssuer(ctx, s, issuer1)
+	err = writeIssuer(ctx, s, &issuer1)
 	require.NoError(t, err)
 
-	err = writeKey(ctx, s, key2)
+	err = writeKey(ctx, s, &key2)
 	require.NoError(t, err)
-	err = writeIssuer(ctx, s, issuer2)
+	err = writeIssuer(ctx, s, &issuer2)
 	require.NoError(t, err)
 
 	fetchedKey1, err := fetchKeyById(ctx, s, key1.ID)
@@ -92,11 +91,24 @@ func Test_IssuerRoundTrip(t *testing.T) {
 	require.ElementsMatch(t, []issuerId{issuer1.ID, issuer2.ID}, issuers)
 }
 
-func genIssuerAndKey(t *testing.T, b *backend) (issuer, key) {
-	certBundle, err := genCertBundle(t, b)
-	require.NoError(t, err)
+func Test_StorageVersionRoundTrip(t *testing.T) {
+	_, s := createBackendWithStorage(t)
 
-	keyId := genKeyId(t)
+	version, err := getStorageVersion(ctx, s)
+	require.NoError(t, err)
+	require.Equal(t, 0, version)
+
+	newVersion := 2
+	err = setStorageVersion(ctx, s, newVersion)
+	require.NoError(t, err)
+	version, err = getStorageVersion(ctx, s)
+	require.NoError(t, err)
+	require.Equal(t, newVersion, version)
+}
+
+func genIssuerAndKey(t *testing.T, b *backend) (issuer, key) {
+	certBundle := genCertBundle(t, b)
+	keyId := genTestingKeyId(t)
 
 	pkiKey := key{
 		ID:             keyId,
@@ -104,7 +116,7 @@ func genIssuerAndKey(t *testing.T, b *backend) (issuer, key) {
 		PrivateKey:     certBundle.PrivateKey,
 	}
 
-	issuerId := genIssuerId(t)
+	issuerId := genTestingIssuerId(t)
 
 	pkiIssuer := issuer{
 		ID:           issuerId,
@@ -117,19 +129,19 @@ func genIssuerAndKey(t *testing.T, b *backend) (issuer, key) {
 	return pkiIssuer, pkiKey
 }
 
-func genIssuerId(t *testing.T) issuerId {
-	issuerIdStr, err := uuid.GenerateUUID()
+func genTestingIssuerId(t *testing.T) issuerId {
+	id, err := genIssuserId()
 	require.NoError(t, err)
-	return issuerId(issuerIdStr)
+	return id
 }
 
-func genKeyId(t *testing.T) keyId {
-	keyIdStr, err := uuid.GenerateUUID()
+func genTestingKeyId(t *testing.T) keyId {
+	id, err := genKeyId()
 	require.NoError(t, err)
-	return keyId(keyIdStr)
+	return id
 }
 
-func genCertBundle(t *testing.T, b *backend) (*certutil.CertBundle, error) {
+func genCertBundle(t *testing.T, b *backend) *certutil.CertBundle {
 	// Pretty gross just to generate a cert bundle, but
 	fields := addCACommonFields(map[string]*framework.FieldSchema{})
 	fields = addCAKeyGenerationFields(fields)
@@ -159,5 +171,5 @@ func genCertBundle(t *testing.T, b *backend) (*certutil.CertBundle, error) {
 	require.NoError(t, err)
 	certBundle, err := parsedCertBundle.ToCertBundle()
 	require.NoError(t, err)
-	return certBundle, err
+	return certBundle
 }

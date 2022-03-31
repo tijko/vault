@@ -84,6 +84,7 @@ func Backend(conf *logical.BackendConfig) *backend {
 
 			SealWrapStorage: []string{
 				"config/ca_bundle",
+				"config/key/*",
 			},
 		},
 
@@ -119,7 +120,8 @@ func Backend(conf *logical.BackendConfig) *backend {
 			secretCerts(&b),
 		},
 
-		BackendType: logical.TypeLogical,
+		BackendType:    logical.TypeLogical,
+		InitializeFunc: migrateStorage,
 	}
 
 	b.crlLifetime = time.Hour * 72

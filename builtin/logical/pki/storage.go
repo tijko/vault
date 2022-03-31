@@ -3,6 +3,8 @@ package pki
 import (
 	"context"
 	"fmt"
+	"github.com/hashicorp/go-uuid"
+	"strconv"
 
 	"github.com/hashicorp/vault/sdk/helper/certutil"
 	"github.com/hashicorp/vault/sdk/helper/errutil"
@@ -10,10 +12,13 @@ import (
 )
 
 const (
-	storageKeyConfig     = "/config/keys"
-	storeageIssuerConfig = "/config/issuers"
-	keyPrefix            = "/config/key/"
-	issuerPrefix         = "/config/issuer/"
+	storageKeyConfig     = "config/keys"
+	storeageIssuerConfig = "config/issuers"
+	keyPrefix            = "config/key/"
+	issuerPrefix         = "config/issuer/"
+	storageVersionKey    = "config/storageVersion"
+
+	legacyCertBundlePath = "config/ca_bundle"
 )
 
 type keyId string
@@ -83,7 +88,7 @@ func fetchKeyById(ctx context.Context, s logical.Storage, keyId keyId) (*key, er
 	return &key, nil
 }
 
-func writeKey(ctx context.Context, s logical.Storage, key key) error {
+func writeKey(ctx context.Context, s logical.Storage, key *key) error {
 	keyId := key.ID
 
 	json, err := logical.StorageEntryJSON(keyPrefix+keyId.String(), key)
@@ -92,6 +97,10 @@ func writeKey(ctx context.Context, s logical.Storage, key key) error {
 	}
 
 	return s.Put(ctx, json)
+}
+
+func deleteKey(ctx context.Context, s logical.Storage, id keyId) error {
+	return s.Delete(ctx, keyPrefix+id.String())
 }
 
 func listIssuers(ctx context.Context, s logical.Storage) ([]issuerId, error) {
@@ -126,7 +135,7 @@ func fetchIssuerById(ctx context.Context, s logical.Storage, issuerId issuerId) 
 	return &issuer, nil
 }
 
-func writeIssuer(ctx context.Context, s logical.Storage, issuer issuer) error {
+func writeIssuer(ctx context.Context, s logical.Storage, issuer *issuer) error {
 	issuerId := issuer.ID
 
 	json, err := logical.StorageEntryJSON(issuerPrefix+issuerId.String(), issuer)
@@ -135,6 +144,10 @@ func writeIssuer(ctx context.Context, s logical.Storage, issuer issuer) error {
 	}
 
 	return s.Put(ctx, json)
+}
+
+func deleteIssuer(ctx context.Context, s logical.Storage, id issuerId) error {
+	return s.Delete(ctx, issuerPrefix+id.String())
 }
 
 func setKeysConfig(ctx context.Context, s logical.Storage, config *keyConfig) error {
@@ -185,4 +198,63 @@ func getIssuersConfig(ctx context.Context, s logical.Storage) (*issuerConfig, er
 	}
 
 	return issuerConfig, nil
+}
+
+func getLegacyCertBundle(ctx context.Context, s logical.Storage) (*certutil.CertBundle, error) {
+	entry, err := s.Get(ctx, legacyCertBundlePath)
+	if err != nil {
+		return nil, err
+	}
+
+	if entry == nil {
+		return nil, nil
+	}
+
+	cb := &certutil.CertBundle{}
+	err = entry.DecodeJSON(cb)
+	if err != nil {
+		return nil, err
+	}
+
+	return cb, nil
+}
+
+func getStorageVersion(ctx context.Context, s logical.Storage) (int, error) {
+	entry, err := s.Get(ctx, storageVersionKey)
+	if err != nil {
+		return 0, err
+	}
+
+	if entry == nil {
+		return 0, nil
+	}
+
+	return strconv.Atoi(string(entry.Value))
+}
+
+func setStorageVersion(ctx context.Context, s logical.Storage, version int) error {
+	entry := &logical.StorageEntry{
+		Key:      storageVersionKey,
+		Value:    []byte(strconv.Itoa(version)),
+		SealWrap: false,
+	}
+	return s.Put(ctx, entry)
+}
+
+func genIssuserId() (issuerId, error) {
+	generateUUID, err := uuid.GenerateUUID()
+	if err != nil {
+		return "", err
+	}
+
+	return issuerId(generateUUID), nil
+}
+
+func genKeyId() (keyId, error) {
+	generateUUID, err := uuid.GenerateUUID()
+	if err != nil {
+		return "", err
+	}
+
+	return keyId(generateUUID), nil
 }
