@@ -266,20 +266,34 @@ func (b *backendGRPCPluginServer) HandleExistenceCheck(ctx context.Context, args
 }
 
 func (b *backendGRPCPluginServer) Cleanup(ctx context.Context, _ *pb.Empty) (*pb.Empty, error) {
-	backend, err := b.getBackend(ctx)
+	b.Lock()
+	defer b.Unlock()
+
+	backend, err := b.getBackendInternal(ctx)
 	if err != nil {
 		return &pb.Empty{}, err
 	}
 
 	backend.Cleanup(ctx)
 
-	brokeredClient, err := b.getBrokeredClient(ctx)
+	brokeredClient, err := b.getBrokeredClientInternal(ctx)
 	if err != nil {
 		return &pb.Empty{}, err
 	}
 
 	// Close rpc clients
 	brokeredClient.Close()
+
+	if _, ok := b.instances["single"]; ok {
+		delete(b.instances, "single")
+	} else {
+		id, err := getMultiplexIDFromContext(ctx)
+		if err != nil {
+			return nil, err
+		}
+		delete(b.instances, id)
+	}
+
 	return &pb.Empty{}, nil
 }
 
