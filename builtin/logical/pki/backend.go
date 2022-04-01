@@ -113,6 +113,11 @@ func Backend(conf *logical.BackendConfig) *backend {
 			pathRevoke(&b),
 			pathTidy(&b),
 			pathTidyStatus(&b),
+
+			// Issuer APIs
+			pathListIssuers(&b),
+			pathGetIssuer(&b),
+			pathGetRawIssuer(&b),
 		},
 
 		Secrets: []*framework.Secret{
