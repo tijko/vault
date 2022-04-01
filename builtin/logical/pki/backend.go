@@ -118,6 +118,7 @@ func Backend(conf *logical.BackendConfig) *backend {
 			pathListIssuers(&b),
 			pathGetIssuer(&b),
 			pathGetRawIssuer(&b),
+			pathImportIssuer(&b),
 		},
 
 		Secrets: []*framework.Secret{
