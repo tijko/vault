@@ -81,7 +81,7 @@ jobs:
       - name: UI Build
         run: |
           cd ui
-          yarn install --ignore-optional
+          yarn install 
           npm rebuild node-sass
           yarn --verbose run build
           cd ..
@@ -127,7 +127,7 @@ jobs:
       - name: UI Build
         run: |
           cd ui
-          yarn install --ignore-optional
+          yarn install 
           npm rebuild node-sass
           yarn --verbose run build
           cd ..
@@ -202,7 +202,7 @@ jobs:
       - name: UI Build
         run: |
           cd ui
-          yarn install --ignore-optional
+          yarn install 
           npm rebuild node-sass
           yarn --verbose run build
           cd ..
